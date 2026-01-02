@@ -1,0 +1,347 @@
+<!DOCTYPE html>
+<html lang="fr">
+<head>
+<meta charset="UTF-8">
+<title>Portail Inter-Services</title>
+<meta name="viewport" content="width=device-width, initial-scale=1">
+
+<style>
+body{
+margin:0;
+font-family:Arial,Helvetica,sans-serif;
+color:white;
+background:linear-gradient(-45deg,#0f2027,#203a43,#2c5364,#1c1c3c);
+background-size:400% 400%;
+animation:bg 14s infinite;
+min-height:100vh;
+}
+@keyframes bg{
+0%{background-position:0% 50%}
+50%{background-position:100% 50%}
+100%{background-position:0% 50%}
+}
+.hidden{display:none}
+
+header{
+text-align:center;
+padding:40px 20px;
+}
+
+#adminBtn{
+position:fixed;
+top:15px;
+right:15px;
+padding:10px 18px;
+border:none;
+border-radius:20px;
+background:#00eaff;
+color:#000;
+font-weight:bold;
+cursor:pointer;
+}
+
+/* PORTAIL */
+#categories{
+display:flex;
+justify-content:center;
+flex-wrap:wrap;
+gap:10px;
+margin-bottom:20px;
+}
+#categories button{
+background:#000;
+color:white;
+border:1px solid #00eaff;
+border-radius:20px;
+padding:6px 14px;
+cursor:pointer;
+}
+
+#grid{
+max-width:1200px;
+margin:auto;
+padding:30px;
+display:grid;
+grid-template-columns:repeat(auto-fit,minmax(200px,1fr));
+gap:20px;
+}
+
+.card{
+background:#1e1e1e;
+border-radius:15px;
+padding:20px;
+text-align:center;
+transition:.2s;
+}
+.card:hover{transform:translateY(-5px)}
+.card img{
+width:100px;
+border-radius:10px;
+margin-bottom:10px;
+}
+
+/* LOGIN */
+.login{
+max-width:400px;
+margin:120px auto;
+background:#1e1e1e;
+padding:30px;
+border-radius:20px;
+text-align:center;
+}
+.login input,.login button{
+width:100%;
+padding:12px;
+margin-top:10px;
+border-radius:10px;
+border:none;
+}
+.login button{
+background:#006aff;
+font-weight:bold;
+cursor:pointer;
+}
+
+/* ADMIN */
+.admin{
+max-width:1000px;
+margin:auto;
+padding:30px;
+}
+.panel{
+background:#1e1e1e;
+padding:25px;
+border-radius:20px;
+margin-bottom:20px;
+}
+input,select,button{
+padding:10px;
+border-radius:10px;
+border:none;
+margin:5px 0;
+}
+.resource{
+background:#3c2d2d;
+padding:10px;
+border-radius:10px;
+display:flex;
+justify-content:space-between;
+align-items:center;
+margin-top:10px;
+}
+.resource img{
+width:40px;
+border-radius:6px;
+}
+.danger{background:#ff4d4d;color:white}
+.ok{background:#3cff9a;color:black}
+</style>
+</head>
+
+<body>
+
+<button id="adminBtn">Accéder au panel admin</button>
+
+<!-- PUBLIC -->
+<div id="public">
+<header>
+<h1>Portail Inter-Services</h1>
+<p>Accès rapide aux services</p>
+</header>
+
+<div id="categories"></div>
+<div id="grid"></div>
+</div>
+
+<!-- LOGIN -->
+<div id="login" class="hidden">
+<div class="login">
+<h2>Connexion administrateur</h2>
+<input id="uid" placeholder="Identifiant">
+<input id="pwd" type="password" placeholder="Mot de passe">
+<button onclick="login()">Connexion au panel administrateur</button>
+</div>
+</div>
+
+<!-- ADMIN -->
+<div id="admin" class="hidden">
+<div class="admin">
+
+<div class="panel">
+<h2>Ajouter / Modifier une ressource</h2>
+<select id="type">
+<option value="link">Lien</option>
+<option value="image">Image</option>
+</select>
+<input id="title" placeholder="Titre">
+<input id="link" placeholder="Lien (obligatoire)">
+<input id="cat" placeholder="Catégorie">
+<input id="img" type="file" accept="image/*">
+<br>
+<button class="ok" onclick="saveRes()">Enregistrer</button>
+<button class="danger" onclick="logout()">Déconnexion</button>
+</div>
+
+<div class="panel">
+<h2>Ressources</h2>
+<div id="adminList"></div>
+</div>
+
+</div>
+</div>
+
+<script>
+/* CONFIG */
+const ADMIN_ID="tal";
+const ADMIN_MDP="tdjn.2026";
+
+
+const publicEl=document.getElementById("public");
+const loginEl=document.getElementById("login");
+const adminEl=document.getElementById("admin");
+const adminBtn=document.getElementById("adminBtn");
+
+let data=JSON.parse(localStorage.getItem("resources"))||[];
+let editIndex=null;
+
+/* NAV */
+adminBtn.onclick=()=>{
+publicEl.classList.add("hidden");
+loginEl.classList.remove("hidden");
+};
+
+function login(){
+if(uid.value===ADMIN_ID && pwd.value===ADMIN_MDP){
+localStorage.setItem("admin","1");
+loginEl.classList.add("hidden");
+adminEl.classList.remove("hidden");
+adminBtn.classList.add("hidden");
+renderAdmin();
+}else alert("Identifiants incorrects");
+}
+
+function logout(){
+localStorage.removeItem("admin");
+location.reload();
+}
+
+if(localStorage.getItem("admin")==="1"){
+publicEl.classList.add("hidden");
+adminEl.classList.remove("hidden");
+adminBtn.classList.add("hidden");
+renderAdmin();
+}
+
+/* DATA */
+function normalize(url){
+if(!/^https?:\/\//i.test(url)) return "http://"+url;
+return url;
+}
+
+function saveRes(){
+if(!title.value || !link.value){
+alert("Le lien est obligatoire");
+return;
+}
+
+let res={
+type:type.value,
+title:title.value,
+link:normalize(link.value),
+cat:cat.value||"Autre",
+img:null
+};
+
+const finish=()=>{
+if(editIndex!==null){
+data[editIndex]=res;
+editIndex=null;
+}else data.push(res);
+
+localStorage.setItem("resources",JSON.stringify(data));
+renderAdmin();
+renderPublic();
+};
+
+if(type.value==="image"){
+if(img.files[0]){
+let r=new FileReader();
+r.onload=()=>{res.img=r.result;finish();}
+r.readAsDataURL(img.files[0]);
+}else if(editIndex!==null){
+res.img=data[editIndex].img;
+finish();
+}else alert("Image requise");
+}else finish();
+}
+
+/* RENDER */
+function renderPublic(){
+grid.innerHTML="";
+categories.innerHTML="<button onclick='renderPublic()'>Tous</button>";
+[...new Set(data.map(r=>r.cat))].forEach(c=>{
+categories.innerHTML+=`<button onclick="filter('${c}')">${c}</button>`;
+});
+
+data.forEach(r=>{
+grid.innerHTML+=`
+<div class="card">
+<a href="${r.link}" target="_blank">
+${r.type==="image"?`<img src="${r.img}">`:""}
+<h3>${r.title}</h3>
+</a>
+</div>`;
+});
+}
+
+function filter(cat){
+grid.innerHTML="";
+data.filter(r=>r.cat===cat).forEach(r=>{
+grid.innerHTML+=`
+<div class="card">
+<a href="${r.link}" target="_blank">
+${r.type==="image"?`<img src="${r.img}">`:""}
+<h3>${r.title}</h3>
+</a>
+</div>`;
+});
+}
+
+function renderAdmin(){
+adminList.innerHTML="";
+data.forEach((r,i)=>{
+adminList.innerHTML+=`
+<div class="resource">
+${r.type==="image"?`<img src="${r.img}">`:"🔗"} ${r.title}
+<span>
+<button onclick="editRes(${i})">✏️</button>
+<button class="danger" onclick="delRes(${i})">🗑</button>
+</span>
+</div>`;
+});
+}
+
+function editRes(i){
+editIndex=i;
+let r=data[i];
+type.value=r.type;
+title.value=r.title;
+link.value=r.link;
+cat.value=r.cat;
+window.scrollTo(0,0);
+}
+
+function delRes(i){
+if(confirm("Supprimer cette ressource ?")){
+data.splice(i,1);
+localStorage.setItem("resources",JSON.stringify(data));
+renderAdmin();
+renderPublic();
+}
+}
+
+renderPublic();
+</script>
+<p>© 2026 CLG VICTOR DURUY</p>
+</body>
+</html>
